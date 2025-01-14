@@ -7,6 +7,7 @@ from langchain.prompts import ChatPromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
+from utils.db_utils import save_to_mongo
 
 # Load environment variables
 load_dotenv()
@@ -96,6 +97,9 @@ if user_input := st.chat_input("질문을 입력하세요..."):
 
     # Display assistant response in the chat
     st.chat_message("assistant").markdown(response)
+
+    # MongoDB 저장
+    save_to_mongo(user_input, response)
 
     # # Display the other 3 answers (2nd to 4th) as collapsible questions
     # st.markdown("### 유사한 질문들:")
