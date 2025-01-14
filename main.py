@@ -43,6 +43,11 @@ async def serve_html():
         html_content = f.read()
     return html_content
 
+@app.post("/dialog")
+async def input_dialog(voice: str):
+    print(voice)
+    return voice
+
 
 # streamlit run main.py
 # uvicorn main:app --reload

@@ -8,11 +8,14 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 from utils.db_utils import save_to_mongo
+from scripts import pinecone_db
 
 # Load environment variables
 load_dotenv()
 UPSTAGE_API_KEY = os.getenv("UPSTAGE_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+
+print(PINECONE_API_KEY)
 
 # Embedding and Pinecone initialization
 embedding = UpstageEmbeddings(model="solar-embedding-1-large", api_key=UPSTAGE_API_KEY)
@@ -23,7 +26,6 @@ database = PineconeVectorStore.from_existing_index(index_name=index_name, embedd
 st.title("상담사용 챗봇")
 st.markdown("고객의 질문에 대한 답변을 빠르게 검색하세요!")
 
-
 def chatbot_invoke(request_str):
     retriever = database.as_retriever(
         search_type="mmr", search_kwargs={"k": 3, "fetch_k": 5}
@@ -33,18 +35,37 @@ def chatbot_invoke(request_str):
     [context]: {context}
     ---
     [질의]: {query}
-
-    위의 [context] 정보 내에서 [질의]에 대해 상담사 입장에서 사용자가 만족할 수 있을 정도로 성의있게 답하세요.
-    단, [context] 정보에 없는 내용을 답해서는 안됩니다. 최대한 문장을 쉼표로 끊어서 대답하기 보다는, 온점으로 문장을 끊어주세요.
-    이 모든 정보를 종합해서 2~3줄의 구어체로 답해주세요.
-
+    
+    7년 이상의 경력을 가진 상담사라고 생각하고, 위의 [context] 정보 내에서 [질의]에 대해 상담사 입장에서 사용자가 만족할 수 있을 정도로 성의있게 답해주세요.
+    최대한 문장을 쉼표로 끊어서 대답하기 보다는 온점으로 문장을 끊어주세요. 
+    문장의 마무리는 '~요' 보다는 '~다'로 끝나는 쪽이 전문적으로 보입니다.
+    
+    또한, 상담사는 가능한 선에서 직접 확인+안내+해결을 도와주는 직원이므로 직접 확인 후 해결까지 돕는 방향으로 작성해 주세요.
+    그리고, 사용자의 편의를 위해 서비스 특성 상 쿠션어를 사용하시면 좋습니다.
+    쿠션어의 예시는 다음과 같습니다.
+    예시)
+    불편을 드려 죄송합니다.
+    번거로우시겠지만~
+    ~하는 점 양해 부탁드립니다.
+    ~할 예정입니다.
+    ~를 부탁드립니다.
+    
+    위 사항들을 종합해서 2~3줄로 상담사가 활용하기 좋게 대본을 만들어 주세요.
+    
+    만약, 조건별로 안내 내용이 다른 경우
+    1차 응대 (양해멘트 or 1차 안내 등) + 정보 확인 멘트로 대본을 구성하면 됩니다.
+    정보 확인 멘트는 "정확한 상담을 위해 주문하신 주문 번호 확인 부탁드립니다." 입니다.
+    문서의 아래에 각 조건별 대응 방법을 기술해 주세요.
+    
+    단, 제일 중요한 것은 [context] 정보에 없는 내용을 답해서는 안됩니다. [context]에 정보가 없거나 문서들의 유사성이 0.2 이하로 떨어질 경우, 
+    "문의주신 내용은 확인이 필요하여 지금 답변드리기 어려울 것 같습니다. 번거로우시겠지만 확인 후에 다시 연락드려도 괜찮을까요?" 라고 답해주세요.
     """
     prompt = ChatPromptTemplate.from_template(template)
 
     llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0)
 
     def merge_pages(pages):
-        merged = "\n\n".join(page.page_content for page in pages)
+        merged = "\n".join(page.page_content for page in pages)
         return merged
 
     chain = (
@@ -55,7 +76,7 @@ def chatbot_invoke(request_str):
     )
 
     answer = chain.invoke(request_str).replace('  ', ' ').split('.')
-    return ".\n\n".join(answer)
+    return ".\n".join(answer)
 
 
 # Create a session state to hold chat history
@@ -79,16 +100,6 @@ if user_input := st.chat_input("질문을 입력하세요..."):
 
     # Process the user's input (e.g., search for the query)
     query = user_input
-    retrieved_docs = database.similarity_search(query, k=4)  # Retrieve top 4 results
-
-    # Prepare assistant response with the highest similarity answer
-    best_doc = retrieved_docs[0]
-
-    best_question_part = best_doc.page_content.split("Question:")[-1].split("Answer:")[0].strip()
-    best_answer_part = best_doc.page_content.split("Answer:")[-1].split("keywords:")[0]
-
-    # markdown 형식으로 수정
-    best_answer_part = best_answer_part.replace('\n', '\n\n')
 
     response = f"**Question:** {query}\n\n**Answer:** {chatbot_invoke(query)}\n\n"
 
