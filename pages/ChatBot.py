@@ -7,11 +7,14 @@ from langchain.prompts import ChatPromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
+from scripts import pinecone_db
 
 # Load environment variables
 load_dotenv()
 UPSTAGE_API_KEY = os.getenv("UPSTAGE_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+
+print(PINECONE_API_KEY)
 
 # Embedding and Pinecone initialization
 embedding = UpstageEmbeddings(model="solar-embedding-1-large", api_key=UPSTAGE_API_KEY)
@@ -21,7 +24,6 @@ database = PineconeVectorStore.from_existing_index(index_name=index_name, embedd
 # Streamlit app layout
 st.title("상담사용 챗봇")
 st.markdown("고객의 질문에 대한 답변을 빠르게 검색하세요!")
-
 
 def chatbot_invoke(request_str):
     retriever = database.as_retriever(
