@@ -24,9 +24,8 @@ jobs:
   # host 설정 
     - name: Deploy to EC2
       run: |
-        ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-        conda activate llm-env
-        echo "Conda llm-env Activated"
+        ssh -t -o StrictHostKeyChecking=no user@host "bash -i -c 'conda activate llm-env && echo Conda Activated'"
+
         cd ${{ secrets.APP_DIR }}
 
         # 최신 코드 가져오기
