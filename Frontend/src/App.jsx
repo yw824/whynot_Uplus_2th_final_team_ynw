@@ -14,22 +14,16 @@ const App = () => {
   ]);
 
   const generateBotResponse = async (userMessage) => {
-    const updateHistory = (text, isError = false) => {
-      setChatHistory((prev) => [
-        ...prev.filter((msg) => msg.text !== "Thinking..."),
-        { role: "model", text, isError },
-      ]);
-    };
-
-    if (!userMessage.trim()) {
-      updateHistory("메시지를 입력해주세요.", true);
-      return;
-    }
+    if (!userMessage.trim()) return;
 
     try {
       setChatHistory((prev) => [...prev, { role: "user", text: userMessage }]);
+      setChatHistory((prev) => [
+        ...prev,
+        { role: "model", text: "Thinking..." },
+      ]);
 
-      const response = await fetch("http://localhost:8000/chatbot", {
+      const response = await fetch("http://localhost:8002/chatbot", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -40,9 +34,25 @@ const App = () => {
       if (!response.ok) throw new Error("서버 오류가 발생했습니다.");
 
       const data = await response.json();
-      updateHistory(data.bot_response);
+
+      setChatHistory((prev) =>
+        prev
+          .filter((msg) => msg.text !== "Thinking...")
+          .concat({
+            role: "model",
+            text: data.bot_response,
+          })
+      );
     } catch (error) {
-      updateHistory(error.message, true);
+      setChatHistory((prev) =>
+        prev
+          .filter((msg) => msg.text !== "Thinking...")
+          .concat({
+            role: "model",
+            text: error.message,
+            isError: true,
+          })
+      );
     }
   };
 
@@ -61,7 +71,10 @@ const App = () => {
           </div>
           <div className="chat-body">
             {chatHistory.map((chat, index) => (
-              <ChatMessage key={index} chat={chat} />
+              <ChatMessage
+                key={`${chat.role}-${index}-${chat.text}`}
+                chat={chat}
+              />
             ))}
           </div>
           <div className="chat-footer">
