@@ -24,7 +24,7 @@ jobs:
   # host 설정 
     - name: Deploy to EC2
       run: |
-        ssh -o StrictHostKeyChecking=no user@host << 'EOF'
+        ssh -o StrictHostKeyChecking=no ubuntu@43.203.27.185 << 'EOF'
         source /home/ubuntu/miniconda3/bin/activate llm-env
 
         echo "Conda llm-env Activated"
