@@ -26,6 +26,7 @@ jobs:
       run: |
         ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
         conda activate llm-env
+        echo "Conda llm-env Activated"
         cd ${{ secrets.APP_DIR }}
 
         # 최신 코드 가져오기
@@ -35,5 +36,16 @@ jobs:
 
         echo "${{ secrets.CREDENTIALS }}" > ./pages/credentials.py
 
-        sudo systemctl restart fastapi
+        echo "Secrets Applied"
+
+        # 실행 중인 uvicorn 프로세스 종료 (포트 충돌 방지)
+        if lsof -i:8000; then
+          echo "FastAPI 애플리케이션이 실행 중입니다. 종료합니다."
+          pkill -f "uvicorn main:app"
+        fi
+
+        # FastAPI 실행
+        nohup uvicorn main:app --reload > fastapi.log 2>&1 &
+
+        echo "FastAPI가 성공적으로 실행되었습니다."
         EOF
