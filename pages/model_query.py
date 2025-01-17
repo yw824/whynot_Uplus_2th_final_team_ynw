@@ -13,7 +13,7 @@ from langchain_core.runnables import RunnablePassthrough
 from sqlalchemy import create_engine, text 
 from sqlalchemy.sql import select
 
-from credentials import user_id, user_pw, endpoint, port, db
+from .credentials import user_id, user_pw, endpoint, port, db
 
 def get_db_connection():
     print(f"database: ", db)
