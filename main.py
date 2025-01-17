@@ -11,7 +11,7 @@ app = FastAPI()
 # CORS 설정 (React 프론트엔드와 연결)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3002", "http://localhost:3000"],  # React 서버 도메인
+    allow_origins=["*"],  # 모든 origin 허용으로 변경
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -99,80 +99,129 @@ async def chat(websocket: WebSocket):
 # ==================================  OBSOLETE ===================================
 
 # 연결된 WebSocket 클라이언트 저장
-connected_clients = []
+connected_clients = set()
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    connected_clients.append(websocket)
     try:
-        # 클라이언트로부터 메시지 수신 (필요하면 처리 가능)
-        data = await websocket.receive_text()
-        print(f"Received: {data}")
-    except WebSocketDisconnect:
+        await websocket.accept()
+        connected_clients.add(websocket)
+        print(f"New client connected. Total clients: {len(connected_clients)}")
+        
+        while True:
+            try:
+                data = await websocket.receive_text()
+                print(f"Received: {data}")
+            except WebSocketDisconnect:
+                break
+    finally:
         connected_clients.remove(websocket)
-        print("Client disconnected")
+        print(f"Client disconnected. Remaining clients: {len(connected_clients)}")
 
 # 고객 메시지 추가 엔드포인트
-@app.post("/chat/customer")
-@app.websocket("/ws")
+@app.post("/chat/customer")  # @app.websocket("/ws") 데코레이터 제거
 async def input_customer_dialog(voice: ChatMessage):
     print(f"Received customer input: {voice.message}")
 
     now = datetime.now().strftime("%H:%M:%S")
-    position = "left" # 고객 말풍선 왼쪽
+    position = "left"
     label = f"[고객:1234] {now}"
     message = voice.message
 
     for client in connected_clients:
         print(client)
-        await client.send_text(json.dumps({"label": label, "position": position, "message": message.strip()}))
+        await client.send_text(json.dumps({
+            "label": label, 
+            "position": position, 
+            "message": message.strip()
+        }))
 
     return {"message": "고객 메시지가 성공적으로 추가되었습니다."}
 
 # 상담사 메시지 추가 엔드포인트
 @app.post("/chat/agent")
-@app.websocket("/ws")
 async def input_agent_dialog(voice: ChatMessage):
     print(f"Received agent input: {voice.message}")
-
     now = datetime.now().strftime("%H:%M:%S")
-    position = "right" # 고객 말풍선 왼쪽
-    label = f"[상담사:김상담] {now}"
-    message = voice.message
+    message_data = {
+        "label": f"[상담사:김상담] {now}",
+        "position": "right",
+        "message": voice.message.strip()
+    }
 
-    if message == "상담 종료":
-        position = "center"
-        message = "상담이 종료되었습니다."
-        label = ""
+    # 상담 종료 처리
+    if voice.message.strip() == "상담 종료":
+        # 종료 메시지로 변경
+        message_data.update({
+            "label": "",
+            "position": "center",
+            "message": "상담이 종료되었습니다."
+        })
+        
+        # 종료 메시지 전송 및 연결 종료
+        disconnected = set()
+        for client in connected_clients:
+            try:
+                await client.send_text(json.dumps(message_data))
+                await client.close()
+                disconnected.add(client)
+            except:
+                disconnected.add(client)
+        
+        # 끊어진 연결 제거
+        connected_clients.difference_update(disconnected)
+        
+        return {"message": "상담이 종료되었습니다."}
 
+    # 일반 메시지 전송
+    disconnected = set()
     for client in connected_clients:
-        print(client)
-        await client.send_text(json.dumps({"label": label, "position": position, "message": message.strip()}))
+        try:
+            await client.send_text(json.dumps(message_data))
+        except:
+            disconnected.add(client)
+    
+    # 끊어진 연결 제거
+    connected_clients.difference_update(disconnected)
 
     return {"message": "상담사 메시지가 성공적으로 추가되었습니다."}
+    # 연결된 클라이언트들 중 끊어진 연결 처리
+    disconnected = set()
+    for client in connected_clients:
+        try:
+            await client.send_text(json.dumps(message_data))
+        except:
+            disconnected.add(client)
+    
+    # 끊어진 연결 제거
+    connected_clients.difference_update(disconnected)
+
+    return {"message": "상담사 메시지가 성공적으로 추가되었습니다."}
+
+
 
 from pages.model_query import find_similar_doc_from_db
 
 class ChatbotQueryInput(BaseModel):
     user_message: str  # The field is fixed and required
 
-@app.post("/chatbot") # http://localhost:8000/chatbot
-def chatbot_query(query_input: ChatbotQueryInput):  # Expecting a dictionary input
+@app.post("/chatbot")
+async def chatbot_query(query_input: ChatbotQueryInput):
     user_message = query_input.user_message
-    """
-    input : { user_message: userMessage }
-
-    output : 
-        {
-        "bot_response": "안녕하세요! 오늘 날씨는 맑고 기온은 25도입니다."
+    try:
+        answer = find_similar_doc_from_db(user_message)
+        print(f"answer: ", answer)
+        
+        # 응답을 한 번만 보내도록 수정
+        return {
+            "status": "success",
+            "bot_response": answer.replace('  ', ' ')
         }
-    """
-    answer = find_similar_doc_from_db(user_message)
-    print(f"answer: ", answer)
-    return {
-        "bot_response" : answer.replace('  ', ' ')
-    }
+    except Exception as e:
+        return {
+            "status": "error",
+            "bot_response": str(e)
+        }
 
 # 실행 명령어
 # uvicorn main:app --port 8002 --reload
