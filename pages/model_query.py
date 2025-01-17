@@ -16,9 +16,10 @@ from sqlalchemy.sql import select
 from .credentials import user_id, user_pw, endpoint, port, db
 
 def get_db_connection():
+    dotenv.load_dotenv()
     print(f"database: ", db)
     # MySQL 연결 설정
-    DATABASE_URL = f"mysql+pymysql://{user_id}:{user_pw}@{endpoint}:{port}/{db}"  # 실제 연결 정보로 변경
+    DATABASE_URL = f"mysql+pymysql://{user_id}:{user_pw}@{os.environ.get("RDS_ENDPOINT")}:{port}/{db}"  # 실제 연결 정보로 변경
     engine = create_engine(DATABASE_URL, pool_recycle=600)
     conn = engine.connect()
     return engine, conn
