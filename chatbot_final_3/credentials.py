@@ -1,0 +1,5 @@
+user_id = "whynot"
+user_pw = "whynot1234"
+endpoint = "whynot-database.cv4k2om66eex.ap-northeast-2.rds.amazonaws.com"
+port = "3306"
+db = "cache_db"
