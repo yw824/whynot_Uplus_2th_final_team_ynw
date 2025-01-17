@@ -24,7 +24,10 @@ jobs:
   # host 설정 
     - name: Deploy to EC2
       run: |
-        ssh -t -o StrictHostKeyChecking=no user@host "bash -i -c 'conda activate llm-env && echo Conda Activated'"
+        ssh -o StrictHostKeyChecking=no user@host << 'EOF'
+        source /home/ubuntu/miniconda3/bin/activate llm-env
+
+        echo "Conda llm-env Activated"
 
         cd ${{ secrets.APP_DIR }}
 
