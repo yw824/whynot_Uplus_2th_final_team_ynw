@@ -177,3 +177,8 @@ def chatbot_query(query_input: ChatbotQueryInput):  # Expecting a dictionary inp
 # 실행 명령어
 # uvicorn main:app --port 8002 --reload
 # npm start
+
+import uvicorn
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", reload=True)
