@@ -1,0 +1,38 @@
+name: Deploy FastAPI to EC2
+
+on:
+  push:
+    branches:
+      - back_stage
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Setup SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.EC2_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+
+  # pages/credential.py 설정 
+  # .env 설정 
+  # host 설정 
+    - name: Deploy to EC2
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+        cd ${{ secrets.APP_DIR }}
+
+        # 최신 코드 가져오기
+        git pull origin back_stage
+
+        echo "${{ secrets.ENV }}" > .env
+
+        echo "${{ secrets.CREDENTIALS }}" > ./pages/credentials.py
+
+        sudo systemctl restart fastapi
+        EOF
